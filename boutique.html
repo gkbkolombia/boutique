@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Boutique Optimisée QR + Stock</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body{font-family:Arial,sans-serif;margin:0;padding:0;background:#f0f2f5;}
+h1,h2,h3{text-align:center;margin:10px 0;}
+.hidden{display:none;}
+button{margin:5px;padding:8px 12px;border:none;border-radius:5px;color:white;cursor:pointer;}
+button i{margin-right:5px;}
+input,select{padding:5px;margin:5px;border-radius:3px;border:1px solid #ccc;}
+section{padding:20px;max-width:900px;margin:auto;background:white;margin-top:20px;border-radius:10px;box-shadow:0 0 10px rgba(0,0,0,0.1);}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+table th,table td{border:1px solid #ddd;padding:8px;text-align:center;}
+table th{background:#4CAF50;color:white;}
+.menu{display:flex;gap:20px;flex-wrap:wrap;justify-content:center;margin:20px 0;}
+.btn{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:150px;height:110px;background:#4CAF50;color:white;border-radius:15px;text-decoration:none;font-size:16px;box-shadow:0 3px 6px rgba(0,0,0,0.2);transition: transform 0.2s, background 0.2s;text-align:center;}
+.btn:hover{transform:scale(1.05);}
+.btn i{font-size:28px;margin-bottom:8px;}
+.btn-green{background:#4CAF50;}
+.btn-blue{background:#2196F3;}
+.btn-red{background:#f44336;}
+.btn-orange{background:#FF9800;}
+.btn-purple{background:#9C27B0;}
+.btn-gray{background:#607D8B;}
+@media(max-width:600px){
+ input,select,button{width:100%;margin:5px 0;}
+ table,tbody,th,td,tr{display:block;width:100%;}
+ table td{text-align:right;padding-left:50%;position:relative;}
+ table td::before{content:attr(data-label);position:absolute;left:0;width:50%;padding-left:5px;font-weight:bold;text-align:left;}
+}
+</style>
+</head>
+<body>
+
+<section id="login">
+  <h2>Connexion</h2>
+  <input type="text" id="username" placeholder="Nom utilisateur">
+  <input type="password" id="password" placeholder="Mot de passe">
+  <button class="btn-green" onclick="login()"><i class="fa fa-sign-in-alt"></i> Se connecter</button>
+</section>
+
+<section id="menuSection" class="hidden">
+  <h1 id="welcome"></h1>
+  <div class="menu" id="menu"></div>
+</section>
+
+<section id="produits" class="hidden">
+  <h2>Produits</h2>
+  <input type="text" id="produitNom" placeholder="Nom">
+  <input type="text" id="produitCategorie" placeholder="Catégorie">
+  <input type="number" id="produitStock" placeholder="Stock">
+  <input type="number" id="produitPrix" placeholder="Prix unitaire">
+  <input type="number" id="produitPrixGros" placeholder="Prix gros">
+  <input type="number" id="produitQuantiteGros" placeholder="Quantité min gros">
+  <button class="btn-green" onclick="saveProduit()"><i class="fa fa-save"></i> Enregistrer</button>
+  <button class="btn-red" onclick="clearProduitForm()"><i class="fa fa-times"></i> Annuler</button>
+
+    <input type="text" id="produitSearch" placeholder="Rechercher un produit..." onkeyup="renderProduits()">
+  <div id="produitList"></div>
+</section>
+
+<section id="stock" class="hidden">
+  <h2>Gestion des Stocks</h2>
+  <h3>Alertes de stock bas</h3>
+  <div id="alertesStockContainer"></div>
+  <hr style="margin: 20px 0;">
+  <h3>Réception de stock</h3>
+  <select id="stockProduitSelect"></select>
+  <input type="number" id="stockProduitQuantite" placeholder="Quantité ajoutée">
+  <button class="btn-green" onclick="addStock()"><i class="fa fa-plus"></i> Ajouter au stock</button>
+</section>
+
+<section id="clients" class="hidden">
+  <h2>Clients</h2>
+    <input type="text" id="clientSearch" placeholder="Rechercher un client..." onkeyup="renderClientsList()">
+  <div id="clientList"></div>
+</section>
+
+<section id="panier" class="hidden">
+  <h2>Panier Client</h2>
+  <input type="text" id="panierClientNom" placeholder="Nom du client">
+  <select id="selectClient"><option value="">-- Choisir un client existant --</option></select>
+  <select id="panierProduit"></select>
+  <input type="number" id="panierQuantite" placeholder="Quantité">
+  <button class="btn-green" onclick="ajouterAuPanier()"><i class="fa fa-plus"></i> Ajouter</button>
+  <button class="btn-blue" onclick="scanQRCode()"><i class="fa fa-qrcode"></i> Scanner QR Produit</button>
+  <div id="qr-reader" style="width:300px;margin:auto;"></div>
+  <table>
+    <thead><tr><th>Produit</th><th>Qté</th><th>Prix unitaire</th><th>Total</th><th>Type</th><th>Action</th></tr></thead>
+    <tbody id="panierTable"></tbody>
+  </table>
+  <p>Total : <span id="panierTotal">0</span> FCFA</p>
+  <button class="btn-green" onclick="validerCommande()"><i class="fa fa-check"></i> Valider</button>
+  <button class="btn-red" onclick="clearPanierConfirm()"><i class="fa fa-trash"></i> Vider</button>
+</section>
+
+<section id="ventes" class="hidden">
+  <h2>Historique Ventes</h2>
+  <div class="filters">
+    <select id="filterVenteCaissier" onchange="renderVentes()"><option value="">Tous</option></select>
+    <input type="date" id="filterVenteDate" onchange="renderVentes()">
+    <button class="btn-blue" onclick="exportVentesCSV()"><i class="fa fa-file-csv"></i> Export CSV</button>
+  </div>
+  <div id="venteTableContainer"></div>
+</section>
+
+<section id="rapportsVentes" class="hidden">
+  <h2>Rapports</h2>
+  <h3 id="grandTotalVentes"></h3>
+  <hr style="margin: 20px 0;">
+  <label>Date: <input type="date" id="filterRapportDate" onchange="renderRapportsVentes()"></label>
+  <label>Caissier:
+    <select id="filterRapportCaissier" onchange="renderRapportsVentes()"><option value="">Tous</option></select>
+  </label>
+  <button class="btn-blue" onclick="exportRapportsCSV()"><i class="fa fa-file-csv"></i> Export CSV</button>
+  <div id="rapportVentesTableContainer"></div>
+  
+  <hr style="margin: 20px 0;">
+  <div id="rapportCaissierContainer"></div>
+
+    <hr style="margin: 20px 0;">
+  <h3>Ventes par mois</h3>
+  <canvas id="ventesChart"></canvas>
+  <hr style="margin: 20px 0;">
+  <h3>Produits les plus vendus</h3>
+  <div id="classementProduitsContainer"></div>
+</section>
+
+<section id="utilisateurs" class="hidden">
+  <h2>Gestion Caissiers</h2>
+  <input type="text" id="newUserName" placeholder="Nom utilisateur">
+  <input type="password" id="newUserPassword" placeholder="Mot de passe">
+  <button class="btn-green" onclick="createCaissier()"><i class="fa fa-user-plus"></i> Créer</button>
+  <ul id="listeCaissiers"></ul>
+</section>
+
+<script>
+// ===== DATA & SESSION =====
+let data={produits:[],clients:[],ventes:[],users:[{username:'gkb',password:'gkb@1985',role:'admin'}]};
+let panier=[],currentUser=null;
+let html5QrcodeScanner=null;
+
+function saveData(){localStorage.setItem("boutiqueData",JSON.stringify(data));}
+function loadData(){const d=localStorage.getItem("boutiqueData");if(d)data=JSON.parse(d);}
+function saveSession(){localStorage.setItem("currentUser",JSON.stringify(currentUser));}
+function loadSession(){currentUser=JSON.parse(localStorage.getItem("currentUser"));return currentUser;}
+
+// ===== UTILITAIRES =====
+function createBtn(section,icon,label,color){
+  const a=document.createElement("a");a.href="#";a.className="btn";a.style.background=color;
+  a.innerHTML=`<i class="${icon}"></i>${label}`;a.onclick=()=>showSection(section);return a;
+}
+function renderTable(headers,rows){
+  let html="<table><thead><tr>"+headers.map(h=>`<th>${h}</th>`).join("")+"</tr></thead><tbody>";
+  html+=rows.map(r=>"<tr>"+r.map((c,i)=>`<td data-label='${headers[i]}'>${c}</td>`).join("")+"</tr>").join("");
+  return html+"</tbody></table>";
+}
+function exportToCSV(filename,rows,headers){
+  let csv = headers.join(",") + "\n";
+  rows.forEach(r=>{csv+=r.map(c=>`"${c}"`).join(",")+"\n";});
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url);
+}
+
+// ===== AUTH =====
+function login(){
+  const u=document.getElementById("username").value,p=document.getElementById("password").value;
+  const user=data.users.find(x=>x.username===u&&x.password===p);
+  if(!user){ alert("Identifiants incorrects"); return; }
+  currentUser=user;saveSession();initUI();
+}
+function logout(){localStorage.removeItem("currentUser");location.reload();}
+
+// ===== UI =====
+function initUI(){
+  document.getElementById("login").classList.add("hidden");
+  document.getElementById("menuSection").classList.remove("hidden");
+  document.getElementById("welcome").textContent="Bienvenue, "+currentUser.username;
+  const menu=document.getElementById("menu");menu.innerHTML="";
+  if(currentUser.role==="admin"){
+    menu.appendChild(createBtn('produits','fas fa-box','Produits','#4CAF50'));
+    menu.appendChild(createBtn('stock','fas fa-box-open','Stock','#03A9F4'));
+    menu.appendChild(createBtn('clients','fas fa-users','Clients','#2196F3'));
+    menu.appendChild(createBtn('panier','fas fa-shopping-cart','Panier','#FF9800'));
+    menu.appendChild(createBtn('ventes','fas fa-receipt','Ventes','#FF5722'));
+    menu.appendChild(createBtn('rapportsVentes','fas fa-chart-line','Rapports','#9C27B0'));
+    menu.appendChild(createBtn('utilisateurs','fas fa-user-tie','Caissiers','#607D8B'));
+  }else{
+    menu.appendChild(createBtn('panier','fas fa-shopping-cart','Panier','#FF9800'));
+    menu.appendChild(createBtn('ventes','fas fa-receipt','Ventes','#FF5722'));
+  }
+  const deco=createBtn('#','fas fa-sign-out-alt','Déconnexion','#f44336');deco.onclick=logout;menu.appendChild(deco);
+  renderProduits();renderClientsList();renderProduitsPanier();renderCaissiers();renderFilterCaissiers();renderVentes();renderRapportsVentes();renderRapportParCaissier();
+  renderGrandTotalVentes();
+  renderStockSelect();
+  renderAlertesStock();
+  renderVentesChart();
+  renderClassementProduits();
+}
+function showSection(id){document.querySelectorAll("section").forEach(s=>s.classList.add("hidden"));document.getElementById("menuSection").classList.remove("hidden");if(id!=="#")document.getElementById(id).classList.remove("hidden");}
+
+// ===== PRODUITS =====
+function renderProduits(){
+  const c=document.getElementById("produitList");c.innerHTML="";
+  const searchTerm = document.getElementById("produitSearch").value.toLowerCase();
+  const filteredProduits = data.produits.filter(p => p.nom.toLowerCase().includes(searchTerm) || p.categorie.toLowerCase().includes(searchTerm));
+  
+  if(filteredProduits.length===0){ c.innerHTML="<p>Aucun produit</p>"; return; }
+  c.innerHTML=renderTable(["Nom","Catégorie","Stock","Prix","PrixGros","MinGros","QR","Action"],
+    filteredProduits.map((p,i)=>[p.nom,p.categorie,p.stock,p.prix,p.prixGros,p.quantiteGros,
+      `<button class='btn-blue' onclick='imprimerQRCode(${data.produits.indexOf(p)})'><i class='fa fa-qrcode'></i></button>`,
+      `<button class='btn-red' onclick='supprimerProduit(${data.produits.indexOf(p)})'><i class='fa fa-trash'></i></button>`]));
+}
+function saveProduit(){
+  const n=document.getElementById("produitNom").value;
+  const c=document.getElementById("produitCategorie").value;
+  const s=parseInt(document.getElementById("produitStock").value);
+  const pr=parseFloat(document.getElementById("produitPrix").value);
+  const pg=parseFloat(document.getElementById("produitPrixGros").value);
+  const qg=parseInt(document.getElementById("produitQuantiteGros").value);
+  if(!n||!c||isNaN(s)||isNaN(pr)||isNaN(pg)||isNaN(qg)){ alert("Champs manquants"); return; }
+  const id = Date.now();
+  data.produits.push({id, nom:n,categorie:c,stock:s,prix:pr,prixGros:pg,quantiteGros:qg});
+  saveData(); clearProduitForm(); renderProduits(); renderProduitsPanier();renderStockSelect();renderAlertesStock();
+}
+function clearProduitForm(){["produitNom","produitCategorie","produitStock","produitPrix","produitPrixGros","produitQuantiteGros"].forEach(id=>document.getElementById(id).value="");}
+function supprimerProduit(i){if(confirm("Supprimer ?")){data.produits.splice(i,1);saveData();renderProduits();renderProduitsPanier();renderStockSelect();renderAlertesStock();}}
+function imprimerQRCode(i){
+  const p=data.produits[i]; const w=window.open(); w.document.write(`<h3>${p.nom}</h3><div id="qr"></div>`); new QRCode(w.document.getElementById("qr"),{text:JSON.stringify({id:p.id,nom:p.nom}),width:128,height:128}); w.print();
+}
+
+// ===== GESTION DES STOCKS =====
+function renderAlertesStock(){
+  const alertesContainer = document.getElementById("alertesStockContainer");
+  const produitsEnAlerte = data.produits.filter(p => p.stock < 10);
+  if (produitsEnAlerte.length === 0) {
+    alertesContainer.innerHTML = "<p>Aucun produit en stock bas.</p>";
+  } else {
+    const rows = produitsEnAlerte.map(p => [p.nom, p.stock, `<button class="btn-green" onclick="showSection('stock')">Ajouter</button>`]);
+    alertesContainer.innerHTML = renderTable(["Produit", "Stock", "Action"], rows);
+  }
+}
+function renderStockSelect() {
+  const select = document.getElementById("stockProduitSelect");
+  select.innerHTML = "";
+  data.produits.forEach((p, i) => {
+    let option = document.createElement("option");
+    option.value = i;
+    option.textContent = `${p.nom} - ${p.categorie} (Stock actuel: ${p.stock})`;
+    select.appendChild(option);
+  });
+}
+function addStock() {
+  const produitIndex = document.getElementById("stockProduitSelect").value;
+  const quantite = parseInt(document.getElementById("stockProduitQuantite").value);
+  if (produitIndex === "" || isNaN(quantite) || quantite <= 0) {
+    return alert("Quantité invalide.");
+  }
+  data.produits[produitIndex].stock += quantite;
+  saveData();
+  renderProduits();
+  renderStockSelect();
+  renderAlertesStock();
+  alert("Stock mis à jour !");
+}
+
+
+// ===== CLIENTS =====
+function renderClientsList(){
+  const sel=document.getElementById("selectClient"); 
+  sel.innerHTML='<option value="">-- Choisir --</option>';
+  const searchTerm = document.getElementById("clientSearch").value.toLowerCase();
+  const filteredClients = data.clients.filter(c => c.nom.toLowerCase().includes(searchTerm));
+  filteredClients.forEach((c,i)=>{ 
+    let o=document.createElement("option"); 
+    o.value=data.clients.indexOf(c); 
+    o.textContent=c.nom; 
+    sel.appendChild(o); 
+  });
+  const divClients=document.getElementById("clientList");
+  if(filteredClients.length===0){ divClients.innerHTML="<p>Aucun client enregistré</p>"; }
+  else{ divClients.innerHTML="<ul>"+filteredClients.map(c=>`<li>${c.nom}</li>`).join("")+"</ul>"; }
+}
+
+// ===== PANIER =====
+function renderProduitsPanier(){
+  const sel=document.getElementById("panierProduit");sel.innerHTML="";
+  data.produits.forEach((p,i)=>{let o=document.createElement("option");o.value=i;o.textContent=`${p.nom} - ${p.categorie} (Stock: ${p.stock})`;sel.appendChild(o);});
+}
+function ajouterAuPanier(){
+  const i=document.getElementById("panierProduit").value,q=parseInt(document.getElementById("panierQuantite").value);
+  if(i===""||!q||q<=0)return alert("Quantité invalide");const p=data.produits[i];if(p.stock<q)return alert("Stock insuffisant");
+  let prix=q>=p.quantiteGros?p.prixGros:p.prix;
+  const existing = panier.find(item=>item.nom===p.nom && item.gros=== (q>=p.quantiteGros));
+  if(existing){ existing.quantite+=q; existing.total=existing.quantite*existing.prix; }
+  else { panier.push({nom:p.nom,quantite:q,prix,total:prix*q,gros:q>=p.quantiteGros}); }
+  renderPanier();
+}
+function renderPanier(){
+  const tb=document.getElementById("panierTable");tb.innerHTML="";let total=0;
+  panier.forEach((p,i)=>{
+    tb.innerHTML+=`<tr>
+      <td>${p.nom}</td>
+      <td><input type="number" min="1" value="${p.quantite}" style="width:60px" onchange="updatePanier(${i},this.value)"></td>
+      <td>${p.prix}</td>
+      <td>${p.total}</td>
+      <td>${p.gros?"Gros":"Normal"}</td>
+      <td><button class='btn-red' onclick='removePanier(${i})'><i class='fa fa-trash'></i></button></td>
+    </tr>`; total+=p.total;
+  });
+  document.getElementById("panierTotal").textContent=total;
+}
+function updatePanier(index,newQty){
+  newQty=parseInt(newQty); if(newQty<1)return;
+  let item = panier[index]; item.quantite=newQty; item.total=newQty*item.prix; renderPanier();
+}
+function removePanier(i){panier.splice(i,1); renderPanier();}
+function clearPanierConfirm(){if(confirm("Vider le panier ?")){panier=[]; renderPanier(); document.getElementById("panierClientNom").value="";}}
+function validerCommande(){
+  let cn=document.getElementById("panierClientNom").value.trim();
+  if(cn===""){ let si=document.getElementById("selectClient").value; if(si==="") return alert("Nom client requis"); cn=data.clients[si].nom; }
+  else if(!data.clients.some(c=>c.nom===cn)){ data.clients.push({nom:cn}); saveData(); renderClientsList(); }
+
+  panier.forEach(item=>{ const produit = data.produits.find(p=>p.nom===item.nom); if(produit){ produit.stock -= item.quantite; if(produit.stock<0) produit.stock=0; } });
+
+  const d=new Date();
+  const vente={client:cn,caissier:currentUser.username,panier:[...panier],date:d.toLocaleDateString(),heure:d.toLocaleTimeString(),montant:panier.reduce((s,p)=>s+p.total,0), anneeMois: `${d.getFullYear()}-${d.getMonth() + 1}`};
+  data.ventes.push(vente);saveData();panier=[]; renderPanier(); document.getElementById("panierClientNom").value="";
+  renderProduits(); renderProduitsPanier(); renderVentes(); renderRapportsVentes(); renderRapportParCaissier();
+  renderGrandTotalVentes(); renderAlertesStock(); renderVentesChart(); renderClassementProduits();
+  printTicket(vente);
+}
+
+// MODIFICATION : NOUVELLE FONCTION POUR L'IMPRESSION PDF
+function printTicket(v){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  
+  let y = 10;
+  const addText = (text, size = 12, style = 'normal') => {
+    doc.setFontSize(size);
+    doc.setFont(undefined, style);
+    doc.text(text, 10, y);
+    y += 7;
+  };
+  
+  addText("Ticket de Caisse", 18, 'bold');
+  y += 5;
+  addText(`Client: ${v.client}`);
+  addText(`Date: ${v.date} ${v.heure}`);
+  addText(`Caissier: ${v.caissier}`);
+  y += 5;
+  
+  addText("------------------------------");
+  addText("Produits:", 14, 'bold');
+  
+  v.panier.forEach(p => {
+    addText(`${p.nom} x ${p.quantite} (${p.gros?"Gros":"Normal"})`);
+    addText(`= ${p.total} FCFA`, 12, 'normal');
+    y += 2;
+  });
+  
+  addText("------------------------------");
+  y += 5;
+  addText(`Total: ${v.montant} FCFA`, 16, 'bold');
+  
+  doc.save("ticket.pdf");
+}
+
+// ===== VENTES =====
+function renderVentes(){
+  const fC=document.getElementById("filterVenteCaissier").value,fD=document.getElementById("filterVenteDate").value;
+  let ventes=data.ventes;if(currentUser.role==="caissier")ventes=ventes.filter(v=>v.caissier===currentUser.username);
+  if(fC)ventes=ventes.filter(v=>v.caissier===fC);
+  if(fD)ventes=ventes.filter(v=>v.date===new Date(fD).toLocaleDateString());
+  document.getElementById("venteTableContainer").innerHTML=ventes.length?renderTable(["Date","Heure","Client","Caissier","Montant"],ventes.map(v=>[v.date,v.heure,v.client,v.caissier,v.montant])):"<p>Aucune vente</p>";
+}
+function exportVentesCSV(){
+  const fC=document.getElementById("filterVenteCaissier").value,fD=document.getElementById("filterVenteDate").value;
+  let ventes=data.ventes;if(currentUser.role==="caissier")ventes=ventes.filter(v=>v.caissier===currentUser.username);
+  if(fC)ventes=ventes.filter(v=>v.caissier===fC);
+  if(fD)ventes=ventes.filter(v=>v.date===new Date(fD).toLocaleDateString());
+  if(ventes.length===0)return alert("Aucune vente à exporter");
+  exportToCSV("ventes.csv",ventes.map(v=>[v.date,v.heure,v.client,v.caissier,v.montant]),["Date","Heure","Client","Caissier","Montant"]);
+}
+
+// ===== RAPPORTS =====
+function renderRapportsVentes(){
+  const fC=document.getElementById("filterRapportCaissier").value,fD=document.getElementById("filterRapportDate").value;
+  let ventes=data.ventes;if(fC)ventes=ventes.filter(v=>v.caissier===fC);if(fD)ventes=ventes.filter(v=>v.date===new Date(fD).toLocaleDateString());
+  let tot=ventes.reduce((s,v)=>s+v.montant,0);
+  document.getElementById("rapportVentesTableContainer").innerHTML=ventes.length?renderTable(["Date","Heure","Client","Caissier","Montant"],ventes.map(v=>[v.date,v.heure,v.client,v.caissier,v.montant]))+`<p><b>Total:${tot} FCFA</b></p>`:"<p>Aucun rapport</p>";
+}
+function exportRapportsCSV(){
+  const fC=document.getElementById("filterRapportCaissier").value,fD=document.getElementById("filterRapportDate").value;
+  let ventes=data.ventes;if(fC)ventes=ventes.filter(v=>v.caissier===fC);if(fD)ventes=ventes.filter(v=>v.date===new Date(fD).toLocaleDateString());
+  if(ventes.length===0)return alert("Aucun rapport à exporter");
+  exportToCSV("rapports.csv",ventes.map(v=>[v.date,v.heure,v.client,v.caissier,v.montant]),["Date","Heure","Client","Caissier","Montant"]);
+}
+
+function renderRapportParCaissier(){
+  const rapportCaissierContainer = document.getElementById("rapportCaissierContainer");
+  let totauxParCaissier = {};
+  data.ventes.forEach(vente => {
+    if (totauxParCaissier[vente.caissier]) {
+      totauxParCaissier[vente.caissier] += vente.montant;
+    } else {
+      totauxParCaissier[vente.caissier] = vente.montant;
+    }
+  });
+
+  const caissiers = Object.keys(totauxParCaissier);
+  if (caissiers.length === 0) {
+    rapportCaissierContainer.innerHTML = "<p>Aucune vente enregistrée.</p>";
+    return;
+  }
+
+  const rows = caissiers.map(caissier => [caissier, totauxParCaissier[caissier]]);
+  rapportCaissierContainer.innerHTML = `<h3>Totaux par caissier</h3>` + renderTable(["Caissier", "Total Ventes (FCFA)"], rows);
+}
+
+function renderGrandTotalVentes(){
+  const grandTotalVentes = data.ventes.reduce((sum, vente) => sum + vente.montant, 0);
+  document.getElementById("grandTotalVentes").textContent = `Total général des ventes: ${grandTotalVentes} FCFA`;
+}
+
+let ventesChartInstance = null;
+function renderVentesChart(){
+  const ctx = document.getElementById('ventesChart').getContext('2d');
+  const ventesParMois = {};
+  data.ventes.forEach(v => {
+    const anneeMois = v.anneeMois;
+    if(!ventesParMois[anneeMois]){
+      ventesParMois[anneeMois] = 0;
+    }
+    ventesParMois[anneeMois] += v.montant;
+  });
+  
+  const labels = Object.keys(ventesParMois).sort();
+  const chartData = labels.map(mois => ventesParMois[mois]);
+
+  if(ventesChartInstance) {
+    ventesChartInstance.destroy();
+  }
+
+  ventesChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Ventes (FCFA)',
+        data: chartData,
+        backgroundColor: '#4CAF50',
+        borderWidth: 1
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+function renderClassementProduits(){
+  const classementContainer = document.getElementById("classementProduitsContainer");
+  const produitsVendus = {};
+  data.ventes.forEach(v => {
+    v.panier.forEach(item => {
+      if(!produitsVendus[item.nom]){
+        produitsVendus[item.nom] = 0;
+      }
+      produitsVendus[item.nom] += item.quantite;
+    });
+  });
+  
+  const classementArray = Object.keys(produitsVendus).map(nom => ({
+    nom: nom,
+    quantite: produitsVendus[nom]
+  }));
+  
+  classementArray.sort((a,b) => b.quantite - a.quantite);
+  
+  if (classementArray.length === 0) {
+    classementContainer.innerHTML = "<p>Aucun produit vendu.</p>";
+  } else {
+    const rows = classementArray.map(p => [p.nom, p.quantite]);
+    classementContainer.innerHTML = renderTable(["Produit", "Quantité vendue"], rows);
+  }
+}
+
+
+// ===== CAISSIERS =====
+function createCaissier(){
+  const u=document.getElementById("newUserName").value,p=document.getElementById("newUserPassword").value;
+  if(!u||!p)return alert("Champs requis");
+  if(data.users.some(x=>x.username===u))return alert("Existe déjà");
+  data.users.push({username:u,password:p,role:"caissier"});saveData();renderCaissiers();renderFilterCaissiers();
+  document.getElementById("newUserName").value="";document.getElementById("newUserPassword").value="";
+}
+function renderCaissiers(){
+  const ul=document.getElementById("listeCaissiers");ul.innerHTML="";
+  data.users.filter(u=>u.role==="caissier").forEach(u=>{
+    let li=document.createElement("li");li.textContent=u.username;
+    let b=document.createElement("button");b.className="btn-red";b.innerHTML="<i class='fa fa-trash'></i>";
+    b.onclick=()=>{if(confirm("Supprimer ?")){data.users=data.users.filter(x=>x!==u);saveData();renderCaissiers();renderFilterCaissiers();}};
+    li.appendChild(b);ul.appendChild(li);
+  });
+}
+function renderFilterCaissiers(){
+  const sels=["filterVenteCaissier","filterRapportCaissier"];
+  sels.forEach(id=>{
+    let s=document.getElementById(id);if(!s)return;
+    s.innerHTML="<option value=''>Tous</option>";
+    data.users.filter(u=>u.role==="caissier").forEach(u=>{let o=document.createElement("option");o.value=u.username;o.textContent=u.username;s.appendChild(o);});
+  });
+}
+
+// ===== QR CODE SCANNER =====
+function scanQRCode(){
+  const qrRegion=document.getElementById("qr-reader");
+  qrRegion.innerHTML=""; 
+  if(html5QrcodeScanner){ html5QrcodeScanner.clear().catch(()=>{}); }
+  html5QrcodeScanner = new Html5Qrcode("qr-reader");
+  html5QrcodeScanner.start({facingMode:"environment"}, {fps:10,qrbox:250},
+    qrCodeMessage=>{
+      const prod = JSON.parse(qrCodeMessage);
+      const index = data.produits.findIndex(p=>p.id===prod.id);
+      if(index!==-1){
+        document.getElementById("panierProduit").value=index;
+        ajouterAuPanier();
+      }
+      html5QrcodeScanner.stop();
+      qrRegion.innerHTML="";
+    },
+    errorMessage=>{}
+  );
+}
+
+// ===== START =====
+loadData(); if(loadSession()) initUI();
+window.addEventListener('unload', logout);
+</script>
+</body>
+</html>
